@@ -78,15 +78,16 @@ int main(void)
     conn_amount = 0;
     sin_size = sizeof(client_addr);
     maxsock = sock_fd;
-    // initialize file descriptor set
-    FD_ZERO(&rset);
-    FD_SET(sock_fd, &rset);
-    FD_SET(serial_fd, &rset);
-    // timeout setting
-    tv.tv_sec = 30;
-    tv.tv_usec = 0;
-
     while (1) {
+
+        // initialize file descriptor set
+        FD_ZERO(&rset);
+        FD_SET(sock_fd, &rset);
+        FD_SET(serial_fd, &rset);
+
+        // timeout setting
+        tv.tv_sec = 30;
+        tv.tv_usec = 0;
         // add active connection to fd set
         for (i = 0; i < BACKLOG; i++) {
             if (fd_A[i] != 0) {
