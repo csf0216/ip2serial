@@ -31,6 +31,12 @@ int set_Parity(int fd,int databits,int stopbits,int parity)
         perror("SetupSerial 1");
         return(0);
     }
+    options.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP
+                   | INLCR | IGNCR | ICRNL | IXON);
+    options.c_oflag &= ~OPOST;
+    options.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+    options.c_cflag &= ~(CSIZE | PARENB);
+    options.c_cflag |= CS8;
     options.c_cflag &= ~CSIZE;
     switch (databits) {
         case 7:

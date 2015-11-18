@@ -79,10 +79,10 @@ int main(void)
     maxsock = sock_fd;
     memset(&ip2serial_buf[BUF_SIZE], '\0', 1);
     memset(&serial2ip_buf[BUF_SIZE], '\0', 1);
+        FD_ZERO(&rset);
     while (1) {
 
         // initialize file descriptor set
-        FD_ZERO(&rset);
         FD_SET(sock_fd, &rset);
         FD_SET(serial_fd, &rset);
 
@@ -149,7 +149,7 @@ int main(void)
             }
         }
         // check whether new bytes comes
-        while(FD_ISSET(serial_fd, &rset)) {
+        if(FD_ISSET(serial_fd, &rset)) {
             nRead = read(serial_fd, serial2ip_buf, sizeof(serial2ip_buf));
             if (nRead<= 0) {
                 perror("serial read");
@@ -157,7 +157,7 @@ int main(void)
             } else {        // receive data
                 if (nRead < BUF_SIZE)
                     memset(&serial2ip_buf[nRead], '\0', 1);
-                printf("client[%d] send:%s\n", i, serial2ip_buf);
+                printf("%s", serial2ip_buf);
                 for (i = 0; i < BACKLOG; i++) {
                     if (fd_A[i] != 0) {
                         nWrite = send(fd_A[i],serial2ip_buf, nRead, 0);
@@ -166,7 +166,7 @@ int main(void)
                 }
             }
         }
-        showclient();
+        //showclient();
     }
 
     // close other connections
