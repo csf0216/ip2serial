@@ -35,13 +35,12 @@ int main(void)
     struct sockaddr_in client_addr; // connector's address information
     socklen_t sin_size;
     int yes = 1;
-    char ip2serial_buf[BUF_SIZE], serial2ip_buf[BUF_SIZE];
-    int ret, ret1;
+    char ip2serial_buf[BUF_SIZE+1], serial2ip_buf[BUF_SIZE+1];
+    int ret;
     int i;
-    int buf_idx;
+    int nRead, nWrite;
 
-    char buff[512];
-    char *dev = "/dev/ttyS0";
+    char *dev = "/dev/ttyUSB0";
     int serial_fd = openSerial(dev);
 
     if ((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -78,6 +77,8 @@ int main(void)
     conn_amount = 0;
     sin_size = sizeof(client_addr);
     maxsock = sock_fd;
+    memset(&ip2serial_buf[BUF_SIZE], '\0', 1);
+    memset(&serial2ip_buf[BUF_SIZE], '\0', 1);
     while (1) {
 
         // initialize file descriptor set
@@ -107,18 +108,18 @@ int main(void)
         // check every fd in the set
         for (i = 0; i < conn_amount; i++) {
             if (FD_ISSET(fd_A[i], &rset)) {
-                ret = recv(fd_A[i], ip2serial_buf, sizeof(ip2serial_buf), 0);
-                if (ret <= 0) {        // client close
+                nRead = recv(fd_A[i], ip2serial_buf, sizeof(ip2serial_buf), 0);
+                if (nRead <= 0) {        // client close
                     printf("client[%d] close\n", i);
                     close(fd_A[i]);
                     FD_CLR(fd_A[i], &rset);
                     fd_A[i] = 0;
                 } else {        // receive data
-                    if (ret < BUF_SIZE)
-                        memset(&ip2serial_buf[ret], '\0', 1);
+                    if (nRead < BUF_SIZE)
+                        memset(&ip2serial_buf[nRead], '\0', 1);
                     printf("client[%d] send:%s\n", i, ip2serial_buf);
-                    ret1 = write(serial_fd,ip2serial_buf,ret);
-                    printf("ret1=%d,ret=%d",ret1,ret);
+                    nWrite = write(serial_fd, ip2serial_buf, nRead);
+                    printf("nWrite=%d, nRead=%d", nWrite, nRead);
                 }
             }
 
@@ -148,11 +149,21 @@ int main(void)
             }
         }
         // check whether new bytes comes
-        if (FD_ISSET(serial_fd, &rset)) {
-            ret = read(serial_fd, serial2ip_buf, sizeof(serial2ip_buf));
-            if (ret<= 0) {
+        while(FD_ISSET(serial_fd, &rset)) {
+            nRead = read(serial_fd, serial2ip_buf, sizeof(serial2ip_buf));
+            if (nRead<= 0) {
                 perror("serial read");
                 continue;
+            } else {        // receive data
+                if (nRead < BUF_SIZE)
+                    memset(&serial2ip_buf[nRead], '\0', 1);
+                printf("client[%d] send:%s\n", i, serial2ip_buf);
+                for (i = 0; i < BACKLOG; i++) {
+                    if (fd_A[i] != 0) {
+                        nWrite = send(fd_A[i],serial2ip_buf, nRead, 0);
+                        printf("nRead=%d, nWrite=%d", nRead, nWrite);
+                    }
+                }
             }
         }
         showclient();

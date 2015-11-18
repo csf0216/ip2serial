@@ -6,10 +6,8 @@ void set_speed(int fd, int speed)
     int   status;
     struct termios   Opt;
 
-    int speed_arr[] = {B38400, B19200, B9600, B4800, B2400, B1200, B300,
-        B38400, B19200, B9600, B4800, B2400, B1200, B300, };
-    int name_arr[] = {38400,  19200,  9600,  4800,  2400,  1200,  300,
-        38400,  19200,  9600, 4800, 2400, 1200,  300, };
+    int speed_arr[] = {B115200, B57600, B38400, B19200, B9600, B4800, B2400, B1200, B300, };
+    int name_arr[] = {115200, 57600, 38400,  19200,  9600,  4800,  2400,  1200,  300, };
     if(tcgetattr(fd, &Opt)!=0)
         perror("set_speed");
     for (i= 0;i<sizeof(speed_arr)/sizeof(int);i++) {
@@ -103,7 +101,7 @@ int openSerial(char *Dev)
         perror("Can't Open Serial Port");
         return -1; 
     } else {
-        set_speed(fd, 19200);
+        set_speed(fd, 115200);
         if (set_Parity(fd, 8, 1, 'N')==0) {
             printf("Set Parity Error\n");
             exit (0);
