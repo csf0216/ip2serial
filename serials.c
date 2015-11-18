@@ -1,6 +1,6 @@
 #include "serials.h"
 
-void set_speed(int fd, int speed)
+void setSpeed(int fd, int speed)
 {
     int   i;
     int   status;
@@ -9,7 +9,7 @@ void set_speed(int fd, int speed)
     int speed_arr[] = {B115200, B57600, B38400, B19200, B9600, B4800, B2400, B1200, B300, };
     int name_arr[] = {115200, 57600, 38400,  19200,  9600,  4800,  2400,  1200,  300, };
     if(tcgetattr(fd, &Opt)!=0)
-        perror("set_speed");
+        perror("setSpeed");
     for (i= 0;i<sizeof(speed_arr)/sizeof(int);i++) {
         if(speed == name_arr[i]) {
             tcflush(fd, TCIOFLUSH);
@@ -24,7 +24,7 @@ void set_speed(int fd, int speed)
     }
 }
 
-int set_Parity(int fd,int databits,int stopbits,int parity)
+int setParity(int fd,int databits,int stopbits,int parity)
 {
     struct termios options;
     if(tcgetattr(fd,&options)!=0) {
@@ -107,8 +107,8 @@ int openSerial(char *Dev)
         perror("Can't Open Serial Port");
         return -1; 
     } else {
-        set_speed(fd, 115200);
-        if (set_Parity(fd, 8, 1, 'N')==0) {
+        setSpeed(fd, 115200);
+        if (setParity(fd, 8, 1, 'N')==0) {
             printf("Set Parity Error\n");
             exit (0);
         }   

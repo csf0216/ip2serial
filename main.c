@@ -108,7 +108,7 @@ int main(void)
         // check every fd in the set
         for (i = 0; i < conn_amount; i++) {
             if (FD_ISSET(fd_A[i], &rset)) {
-                nRead = recv(fd_A[i], ip2serial_buf, sizeof(ip2serial_buf), 0);
+                nRead = recv(fd_A[i], ip2serial_buf, BUF_SIZE, 0);
                 if (nRead <= 0) {        // client close
                     printf("client[%d] close\n", i);
                     close(fd_A[i]);
@@ -117,9 +117,9 @@ int main(void)
                 } else {        // receive data
                     if (nRead < BUF_SIZE)
                         memset(&ip2serial_buf[nRead], '\0', 1);
-                    printf("client[%d] send:%s\n", i, ip2serial_buf);
+                    printf("ip to serial: %s", ip2serial_buf);
                     nWrite = write(serial_fd, ip2serial_buf, nRead);
-                    printf("nWrite=%d, nRead=%d", nWrite, nRead);
+                    printf("  nRead=%d, nWrite=%d\n", nWrite, nRead);
                 }
             }
 
@@ -149,19 +149,19 @@ int main(void)
             }
         }
         // check whether new bytes comes
-        if(FD_ISSET(serial_fd, &rset)) {
-            nRead = read(serial_fd, serial2ip_buf, sizeof(serial2ip_buf));
+        if (FD_ISSET(serial_fd, &rset)) {
+            nRead = read(serial_fd, serial2ip_buf, BUF_SIZE);
             if (nRead<= 0) {
                 perror("serial read");
                 continue;
             } else {        // receive data
                 if (nRead < BUF_SIZE)
                     memset(&serial2ip_buf[nRead], '\0', 1);
-                printf("%s", serial2ip_buf);
+                printf("serial to ip: %s", serial2ip_buf);
                 for (i = 0; i < BACKLOG; i++) {
                     if (fd_A[i] != 0) {
                         nWrite = send(fd_A[i],serial2ip_buf, nRead, 0);
-                        printf("nRead=%d, nWrite=%d", nRead, nWrite);
+                        printf("  nRead=%d, nWrite=%d\n", nRead, nWrite);
                     }
                 }
             }
