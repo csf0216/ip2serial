@@ -35,13 +35,13 @@ int main(void)
     struct sockaddr_in client_addr; // connector's address information
     socklen_t sin_size;
     int yes = 1;
-    char buf[BUF_SIZE];
-    int ret;
+    char ip2serial_buf[BUF_SIZE], serial2ip_buf[BUF_SIZE];
+    int ret, ret1;
     int i;
     int buf_idx;
 
     char buff[512];
-    char *dev = "/dev/ttyS1";
+    char *dev = "/dev/ttyS0";
     int serial_fd = openSerial(dev);
 
     if ((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -81,6 +81,7 @@ int main(void)
     // initialize file descriptor set
     FD_ZERO(&rset);
     FD_SET(sock_fd, &rset);
+    FD_SET(serial_fd, &rset);
     // timeout setting
     tv.tv_sec = 30;
     tv.tv_usec = 0;
@@ -105,7 +106,7 @@ int main(void)
         // check every fd in the set
         for (i = 0; i < conn_amount; i++) {
             if (FD_ISSET(fd_A[i], &rset)) {
-                ret = recv(fd_A[i], buf, sizeof(buf), 0);
+                ret = recv(fd_A[i], ip2serial_buf, sizeof(ip2serial_buf), 0);
                 if (ret <= 0) {        // client close
                     printf("client[%d] close\n", i);
                     close(fd_A[i]);
@@ -113,8 +114,10 @@ int main(void)
                     fd_A[i] = 0;
                 } else {        // receive data
                     if (ret < BUF_SIZE)
-                        memset(&buf[ret], '\0', 1);
-                    printf("client[%d] send:%s\n", i, buf);
+                        memset(&ip2serial_buf[ret], '\0', 1);
+                    printf("client[%d] send:%s\n", i, ip2serial_buf);
+                    ret1 = write(serial_fd,ip2serial_buf,ret);
+                    printf("ret1=%d,ret=%d",ret1,ret);
                 }
             }
 
@@ -143,6 +146,14 @@ int main(void)
                 break;
             }
         }
+        // check whether new bytes comes
+        if (FD_ISSET(serial_fd, &rset)) {
+            ret = read(serial_fd, serial2ip_buf, sizeof(serial2ip_buf));
+            if (ret<= 0) {
+                perror("serial read");
+                continue;
+            }
+        }
         showclient();
     }
 
@@ -152,6 +163,7 @@ int main(void)
             close(fd_A[i]);
         }
     }
-
+    close(sock_fd);
+    close(serial_fd);
     exit(0);
 }
