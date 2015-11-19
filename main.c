@@ -15,15 +15,79 @@
 
 #define BUF_SIZE 200
 
-int fd_A[BACKLOG];    // accepted connection fd
-int conn_amount;    // current connection amount
+typedef struct _fdNode {
+    int fd;
+    struct _fdNode *pNext;
+} fdNode;
+
+fdNode *pClientListHead;    // accepted connection fd
+
+void insertFd(int fd)
+{
+    fdNode *pNode, *pNext;
+    int found;
+    if (pClientListHead==NULL) {
+        pNode = malloc(sizeof(fdNode));
+        pNode->fd = fd;
+        pNode->pNext = NULL;
+        pClientListHead = pNode;
+        return;
+    }
+    if (pClientListHead->fd==fd)
+        return;
+    pNode = pClientListHead;
+    pNext = pNode->pNext;
+    found = 0;
+    while (pNext!=NULL) {
+        if (pNext->fd==fd) {
+            found = 1;
+            break;
+        }
+        pNode = pNext;
+        pNext = pNext->pNext;
+    }
+    if (!found) {
+        pNext = malloc(sizeof(fdNode));
+        pNext->fd = fd;
+        pNext->pNext = NULL;
+        pNode->pNext = pNext;
+    }
+}
+
+void deleteFd(int fd)
+{
+    fdNode *pNode, *pNext;
+    if (pClientListHead==NULL)
+        return;
+    if (pClientListHead->pNext==NULL) {
+        if (pClientListHead->fd==fd) {
+            free(pClientListHead);
+            pClientListHead = NULL;
+        }
+        return;
+    }
+    pNode = pClientListHead;
+    pNext = pNode->pNext;
+    while (pNext!=NULL) {
+        if (pNext->fd==fd) {
+            pNode->pNext = pNext->pNext;
+            free(pNext);
+            break;
+        }
+        pNode = pNext;
+        pNext = pNext->pNext;
+    }
+}
 
 void showclient()
 {
     int i;
-    printf("client amount: %d\n", conn_amount);
-    for (i = 0; i < BACKLOG; i++) {
-        printf("[%d]:%d  ", i, fd_A[i]);
+    fdNode *pNode = pClientListHead;
+    i = 0;
+    while (pNode!=NULL) {
+        printf("[%d]:%d  ", i, pNode->fd);
+        pNode = pNode->pNext;
+        i++;
     }
     printf("\n\n");
 }
@@ -39,7 +103,7 @@ int main(void)
     int ret;
     int i;
     int nRead, nWrite;
-
+    fdNode *pNode;
     char *dev = "/dev/ttyUSB0";
     int serial_fd = openSerial(dev);
 
@@ -74,7 +138,7 @@ int main(void)
     int maxsock;
     struct timeval tv;
 
-    conn_amount = 0;
+    pClientListHead = NULL;
     sin_size = sizeof(client_addr);
     maxsock = sock_fd;
     memset(&ip2serial_buf[BUF_SIZE], '\0', 1);
@@ -90,9 +154,9 @@ int main(void)
         tv.tv_sec = 30;
         tv.tv_usec = 0;
         // add active connection to fd set
-        for (i = 0; i < BACKLOG; i++) {
-            if (fd_A[i] != 0) {
-                FD_SET(fd_A[i], &rset);
+        for (pNode = pClientListHead; pNode; pNode=pNode->pNext) {
+            if (pNode->fd != 0) {
+                FD_SET(pNode->fd, &rset);
             }
         }
 
@@ -106,14 +170,16 @@ int main(void)
         }
 
         // check every fd in the set
-        for (i = 0; i < conn_amount; i++) {
-            if (FD_ISSET(fd_A[i], &rset)) {
-                nRead = recv(fd_A[i], ip2serial_buf, BUF_SIZE, 0);
+        i = 0;
+        for (pNode = pClientListHead; pNode; pNode=pNode->pNext) {
+            if (FD_ISSET(pNode->fd, &rset)) {
+                nRead = recv(pNode->fd, ip2serial_buf, BUF_SIZE, 0);
                 if (nRead <= 0) {        // client close
                     printf("client[%d] close\n", i);
-                    close(fd_A[i]);
-                    FD_CLR(fd_A[i], &rset);
-                    fd_A[i] = 0;
+                    close(pNode->fd);
+                    FD_CLR(pNode->fd, &rset);
+                    deleteFd(pNode->fd);
+                    showclient();
                 } else {        // receive data
                     if (nRead < BUF_SIZE)
                         memset(&ip2serial_buf[nRead], '\0', 1);
@@ -122,7 +188,7 @@ int main(void)
                     printf("  nRead=%d, nWrite=%d\n", nWrite, nRead);
                 }
             }
-
+            i++;
         }
 
         // check whether a new connection comes
@@ -134,19 +200,10 @@ int main(void)
             }
 
             // add to fd queue
-            if (conn_amount < BACKLOG) {
-                fd_A[conn_amount++] = new_fd;
-                printf("new connection client[%d] %s:%d\n", conn_amount,
-                        inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-                if (new_fd > maxsock)
-                    maxsock = new_fd;
-            }
-            else {
-                printf("max connections arrive, exit\n");
-                send(new_fd, "bye", 4, 0);
-                close(new_fd);
-                break;
-            }
+            insertFd(new_fd);
+            showclient();
+            if (new_fd > maxsock)
+                maxsock = new_fd;
         }
         // check whether new bytes comes
         if (FD_ISSET(serial_fd, &rset)) {
@@ -158,21 +215,20 @@ int main(void)
                 if (nRead < BUF_SIZE)
                     memset(&serial2ip_buf[nRead], '\0', 1);
                 printf("serial to ip: %s", serial2ip_buf);
-                for (i = 0; i < BACKLOG; i++) {
-                    if (fd_A[i] != 0) {
-                        nWrite = send(fd_A[i],serial2ip_buf, nRead, 0);
+                for (pNode = pClientListHead; pNode; pNode=pNode->pNext) {
+                    if (pNode->fd != 0) {
+                        nWrite = send(pNode->fd,serial2ip_buf, nRead, 0);
                         printf("  nRead=%d, nWrite=%d\n", nRead, nWrite);
                     }
                 }
             }
         }
-        //showclient();
     }
 
     // close other connections
-    for (i = 0; i < BACKLOG; i++) {
-        if (fd_A[i] != 0) {
-            close(fd_A[i]);
+    for (pNode = pClientListHead; pNode; pNode=pNode->pNext) {
+        if (pNode->fd != 0) {
+            close(pNode->fd);
         }
     }
     close(sock_fd);
